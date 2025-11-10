@@ -9,8 +9,12 @@ const int numeroCeldas = 15;
 const int anchoVentana = 750;
 const int altoVentana = 750;
 
-const float tiempoScroll = 0.3f;
+const float tiempoScroll = 0.2f;
 float temporizadorScroll = 0.0f;
+float tiempoSpawnCarro = 1.0f;
+float temporizadorSpawnCarro = 0.0f;
+bool juegoIniciado = false;
+bool esPrimerScroll = true;
 
 enum TipoTerreno
 {
@@ -72,6 +76,7 @@ void reiniciarJuego();
 void actualizarJuego();
 void dibujarJuego();
 void dibujarUI();
+void PoblarFilaDeCalle(Fila& fila);
 
 
 Celda generarCelda(TipoTerreno nuevoTerreno)
@@ -149,12 +154,74 @@ void reiniciarJuego()
 		mapa.push_back(crearFila(i));
 	}
 	proximoIndiceGenerar = -1;
-
+	for (Fila& fila : mapa)
+	{
+		if (fila.terreno == CALLE)
+		{
+			PoblarFilaDeCalle(fila);
+		}
+	}
 	temporizadorScroll = 0.0f;
+	temporizadorSpawnCarro = 0.0f;
+	juegoIniciado = false;
+	esPrimerScroll = true;
+}
+
+void PoblarFilaDeCalle(Fila& fila)
+{
+	int numCarrosAGenerar = GetRandomValue(2, 4);
+	for (int i = 0; i < numCarrosAGenerar; i++)
+	{
+		Carro nuevoCarro;
+		nuevoCarro.tamano = { (float)tamanoCelda * 2, (float)tamanoCelda };
+		float posY = (float)fila.posicion * tamanoCelda;
+		float velocidadAleatoria = 150.0;
+
+		int maxCeldaX = numeroCeldas - (int)(nuevoCarro.tamano.x / tamanoCelda);
+		int celdaXAleatoria = GetRandomValue(0, maxCeldaX);
+		float posX = (float)celdaXAleatoria * tamanoCelda;
+
+		nuevoCarro.posicion = { posX, posY };
+		nuevoCarro.velocidad = fila.vaHaciaDerecha ? velocidadAleatoria : -velocidadAleatoria;
+
+		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
+
+		bool haySolapamiento = false;
+		for (const Carro& carroExistente : carros)
+		{
+			if (carroExistente.posicion.y != posY) continue;
+
+			Rectangle rectCarroExistente = { carroExistente.posicion.x, carroExistente.posicion.y, carroExistente.tamano.x, carroExistente.tamano.y };
+
+			Rectangle rectNuevoConEspacio = rectNuevoCarro;
+			rectNuevoConEspacio.x -= tamanoCelda;
+			rectNuevoConEspacio.width += tamanoCelda * 2;
+
+			if (CheckCollisionRecs(rectNuevoConEspacio, rectCarroExistente))
+			{
+				haySolapamiento = true;
+				break;
+			}
+		}
+
+		if (!haySolapamiento)
+		{
+			carros.push_back(nuevoCarro);
+		}
+	}
 }
 
 void actualizarJuego()
 {
+	if (!juegoIniciado)
+	{
+		if (GetKeyPressed() != 0)
+		{
+			juegoIniciado = true;
+		}
+		return;
+	}
+
 	if (jugador1.posicion.y >= altoVentana)
 		jugador1.estaVivo = false;
 	if (jugador2.posicion.y >= altoVentana)
@@ -170,10 +237,29 @@ void actualizarJuego()
 	}
 
 	temporizadorScroll += GetFrameTime();
-	if (temporizadorScroll >= tiempoScroll)
+	float tiempoLimiteActual = tiempoScroll;
+	if (esPrimerScroll)
 	{
-		temporizadorScroll -= tiempoScroll;
+		tiempoLimiteActual = 2.0f;
+	}
+	if (temporizadorScroll >= tiempoLimiteActual)
+	{
+		if (esPrimerScroll)
+		{
+			temporizadorScroll = 0.0f;
+			esPrimerScroll = false;
+		}
+		else
+		{
+			temporizadorScroll -= tiempoScroll;
+		}
 		mapa.push_back(crearFila(proximoIndiceGenerar));
+
+		Fila& filaRecienCreada = mapa.back();
+		if (filaRecienCreada.terreno == CALLE)
+		{
+			PoblarFilaDeCalle(filaRecienCreada);
+		}
 
 		for (Fila& fila : mapa)
 		{
@@ -277,9 +363,13 @@ void actualizarJuego()
 		}
 	}
 
-	const int chanceGenerar = 10;
-	if (GetRandomValue(1, 100) <= chanceGenerar && !indicesFilasCalle.empty())
+	temporizadorSpawnCarro += GetFrameTime();
+
+	if (temporizadorSpawnCarro >= tiempoSpawnCarro && !indicesFilasCalle.empty())
 	{
+		temporizadorSpawnCarro = 0.0f;
+		tiempoSpawnCarro = (float)GetRandomValue(5, 15) / 10.0f;
+
 		Carro nuevoCarro;
 		nuevoCarro.tamano = { (float)tamanoCelda * 2, (float)tamanoCelda };
 
@@ -288,20 +378,44 @@ void actualizarJuego()
 		Fila& filaDeCalle = mapa[indiceEnMapa];
 
 		int indiceFilaY = filaDeCalle.posicion;
+		float posY = (float)indiceFilaY * tamanoCelda;
 		bool vaHaciaDerecha = filaDeCalle.vaHaciaDerecha;
 		float velocidadAleatoria = 150.0;
 
+		float posX;
 		if (vaHaciaDerecha)
-		{
-			nuevoCarro.posicion = { -nuevoCarro.tamano.x, (float)indiceFilaY * tamanoCelda };
-			nuevoCarro.velocidad = velocidadAleatoria;
-		}
+			posX = -nuevoCarro.tamano.x;
 		else
+			posX = (float)anchoVentana;
+
+		nuevoCarro.posicion = { posX, posY };
+		nuevoCarro.velocidad = vaHaciaDerecha ? velocidadAleatoria : -velocidadAleatoria;
+
+		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
+
+		bool haySolapamiento = false;
+
+		for (const Carro& carroExistente : carros)
 		{
-			nuevoCarro.posicion = { (float)anchoVentana, (float)indiceFilaY * tamanoCelda };
-			nuevoCarro.velocidad = -velocidadAleatoria;
+			if (carroExistente.posicion.y != posY) continue;
+
+			Rectangle rectCarroExistente = { carroExistente.posicion.x, carroExistente.posicion.y, carroExistente.tamano.x, carroExistente.tamano.y };
+
+			Rectangle rectNuevoConEspacio = rectNuevoCarro;
+			rectNuevoConEspacio.x -= tamanoCelda;
+			rectNuevoConEspacio.width += tamanoCelda * 2;
+
+			if (CheckCollisionRecs(rectNuevoConEspacio, rectCarroExistente))
+			{
+				haySolapamiento = true;
+				break;
+			}
 		}
-		carros.push_back(nuevoCarro);
+
+		if (!haySolapamiento)
+		{
+			carros.push_back(nuevoCarro);
+		}
 	}
 
 	for (int i = carros.size() - 1; i >= 0; i--)
