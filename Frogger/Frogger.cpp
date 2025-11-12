@@ -9,10 +9,12 @@ const int numeroCeldas = 15;
 const int anchoVentana = 750;
 const int altoVentana = 750;
 
-const float tiempoScroll = 0.2f;
+float tiempoScroll = 0.0f;
 float temporizadorScroll = 0.0f;
 float tiempoSpawnCarro = 1.0f;
+float velocidadCarro = 0.0f;
 float temporizadorSpawnCarro = 0.0f;
+int intervaloCalles = 0;
 bool juegoIniciado = false;
 bool esPrimerScroll = true;
 
@@ -57,8 +59,26 @@ struct Jugador
 	Texture2D texturaDerecha;
 };
 
+struct Boton
+{
+	Vector2 posicion;
+	Vector2 tamano;
+	Texture2D textura;
+};
+
+struct Fondo
+{
+	Vector2 posicion;
+	Vector2 tamano;
+	Texture2D textura;
+};
+
 Jugador jugador1;
 Jugador jugador2;
+Boton botonFacil;
+Boton botonNormal;
+Boton botonDificil;
+Fondo fondoMenu;
 vector<Fila> mapa;
 vector<Carro> carros;
 vector<int> indicesFilasCalle;
@@ -75,7 +95,7 @@ void inicializarJuego();
 void reiniciarJuego();
 void actualizarJuego();
 void dibujarJuego();
-void dibujarUI();
+void dibujarMenu();
 void PoblarFilaDeCalle(Fila& fila);
 
 
@@ -175,14 +195,13 @@ void PoblarFilaDeCalle(Fila& fila)
 		Carro nuevoCarro;
 		nuevoCarro.tamano = { (float)tamanoCelda * 2, (float)tamanoCelda };
 		float posY = (float)fila.posicion * tamanoCelda;
-		float velocidadAleatoria = 150.0;
 
 		int maxCeldaX = numeroCeldas - (int)(nuevoCarro.tamano.x / tamanoCelda);
 		int celdaXAleatoria = GetRandomValue(0, maxCeldaX);
 		float posX = (float)celdaXAleatoria * tamanoCelda;
 
 		nuevoCarro.posicion = { posX, posY };
-		nuevoCarro.velocidad = fila.vaHaciaDerecha ? velocidadAleatoria : -velocidadAleatoria;
+		nuevoCarro.velocidad = fila.vaHaciaDerecha ? velocidadCarro : -velocidadCarro;
 
 		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
 
@@ -215,13 +234,38 @@ void actualizarJuego()
 {
 	if (!juegoIniciado)
 	{
-		if (GetKeyPressed() != 0)
+		Vector2 mousePos = GetMousePosition();
+
+		Rectangle rectFacil = { botonFacil.posicion.x, botonFacil.posicion.y, botonFacil.tamano.x, botonFacil.tamano.y };
+		Rectangle rectNormal = { botonNormal.posicion.x, botonNormal.posicion.y, botonNormal.tamano.x, botonNormal.tamano.y };
+		Rectangle rectDificil = { botonDificil.posicion.x, botonDificil.posicion.y, botonDificil.tamano.x, botonDificil.tamano.y };
+
+		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
 		{
-			juegoIniciado = true;
+			if (CheckCollisionPointRec(mousePos, rectFacil))
+			{
+				tiempoScroll = 1.0f;
+				velocidadCarro = 150.0f;
+				reiniciarJuego();
+				juegoIniciado = true;
+			}
+			else if (CheckCollisionPointRec(mousePos, rectNormal))
+			{
+				tiempoScroll = 0.5f;
+				velocidadCarro = 200.0f;
+				reiniciarJuego();
+				juegoIniciado = true;
+			}
+			else if (CheckCollisionPointRec(mousePos, rectDificil))
+			{
+				tiempoScroll = 0.2f;
+				velocidadCarro = 300.0f;
+				reiniciarJuego();
+				juegoIniciado = true;
+			}
 		}
 		return;
 	}
-
 	if (jugador1.posicion.y >= altoVentana)
 		jugador1.estaVivo = false;
 	if (jugador2.posicion.y >= altoVentana)
@@ -229,7 +273,7 @@ void actualizarJuego()
 
 	if (!jugador1.estaVivo && !jugador2.estaVivo)
 	{
-		if (IsKeyPressed(KEY_ENTER))
+		if (IsKeyPressed(KEY_R))
 		{
 			reiniciarJuego();
 		}
@@ -239,9 +283,7 @@ void actualizarJuego()
 	temporizadorScroll += GetFrameTime();
 	float tiempoLimiteActual = tiempoScroll;
 	if (esPrimerScroll)
-	{
-		tiempoLimiteActual = 2.0f;
-	}
+		tiempoLimiteActual = 3.0f;
 	if (temporizadorScroll >= tiempoLimiteActual)
 	{
 		if (esPrimerScroll)
@@ -380,7 +422,6 @@ void actualizarJuego()
 		int indiceFilaY = filaDeCalle.posicion;
 		float posY = (float)indiceFilaY * tamanoCelda;
 		bool vaHaciaDerecha = filaDeCalle.vaHaciaDerecha;
-		float velocidadAleatoria = 150.0;
 
 		float posX;
 		if (vaHaciaDerecha)
@@ -389,7 +430,7 @@ void actualizarJuego()
 			posX = (float)anchoVentana;
 
 		nuevoCarro.posicion = { posX, posY };
-		nuevoCarro.velocidad = vaHaciaDerecha ? velocidadAleatoria : -velocidadAleatoria;
+		nuevoCarro.velocidad = vaHaciaDerecha ? velocidadCarro : -velocidadCarro;
 
 		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
 
@@ -483,9 +524,43 @@ void dibujarJuego()
 	);
 }
 
-void dibujarUI()
+void dibujarMenu()
 {
-	
+	DrawTexturePro(
+		fondoMenu.textura,
+		{ 0.0f, 0.0f, (float)fondoMenu.textura.width, (float)fondoMenu.textura.height },
+		{ 0.0f, 0.0f, 750, 750},
+		{ 0.0f, 0.0f },
+		0.0f,
+		WHITE
+	);
+
+	DrawTexturePro(
+		botonFacil.textura,
+		{ 0.0f, 0.0f, (float)botonFacil.textura.width, (float)botonFacil.textura.height },
+		{ botonFacil.posicion.x, botonFacil.posicion.y, botonFacil.tamano.x, botonFacil.tamano.y },
+		{ 0.0f, 0.0f },
+		0.0f,
+		WHITE
+	);
+
+	DrawTexturePro(
+		botonNormal.textura,
+		{ 0.0f, 0.0f, (float)botonNormal.textura.width, (float)botonNormal.textura.height },
+		{ botonNormal.posicion.x, botonNormal.posicion.y, botonNormal.tamano.x, botonNormal.tamano.y },
+		{ 0.0f, 0.0f },
+		0.0f,
+		WHITE
+	);
+
+	DrawTexturePro(
+		botonDificil.textura,
+		{ 0.0f, 0.0f, (float)botonDificil.textura.width, (float)botonDificil.textura.height },
+		{ botonDificil.posicion.x, botonDificil.posicion.y, botonDificil.tamano.x, botonDificil.tamano.y },
+		{ 0.0f, 0.0f },
+		0.0f,
+		WHITE
+	);
 }
 
 
@@ -503,7 +578,25 @@ void inicializarJuego()
 	jugador2.texturaIzquierda = LoadTexture("red_frog_left.png");
 	jugador2.texturaDerecha = LoadTexture("red_frog_right.png");
 
-	reiniciarJuego();
+	fondoMenu.textura = LoadTexture("baseMenu.png");
+	botonFacil.textura = LoadTexture("botonFacil.png");
+	botonNormal.textura = LoadTexture("botonNormal.png");
+	botonDificil.textura = LoadTexture("botonDificil.png");
+
+	fondoMenu.posicion = { 0, 0 };
+	fondoMenu.tamano = { (float)anchoVentana, (float)altoVentana };
+	float btnAncho = 200.0f;
+	float btnAlto = 100.0f;
+	float btnPosX = (anchoVentana - btnAncho) / 2.0f;
+
+	botonFacil.tamano = { btnAncho, btnAlto };
+	botonFacil.posicion = { btnPosX, 350.0f };
+
+	botonNormal.tamano = { btnAncho, btnAlto };
+	botonNormal.posicion = { btnPosX, botonFacil.posicion.y + btnAlto + 20.0f};
+
+	botonDificil.tamano = { btnAncho, btnAlto };
+	botonDificil.posicion = { btnPosX, botonNormal.posicion.y + btnAlto + 20.0f};
 }
 
 int main()
@@ -518,11 +611,17 @@ int main()
 		actualizarJuego();
 
 		BeginDrawing();
-		ClearBackground(SKYBLUE);
+		ClearBackground(DARKBROWN);
 
-		dibujarJuego();
+		if (!juegoIniciado)
+		{
+			dibujarMenu();
+		}
+		else
+		{
+			dibujarJuego();
+		}
 
-		dibujarUI();
 
 		EndDrawing();
 	}
@@ -535,6 +634,10 @@ int main()
 	UnloadTexture(jugador2.texturaAbajo);
 	UnloadTexture(jugador2.texturaIzquierda);
 	UnloadTexture(jugador2.texturaDerecha);
+	UnloadTexture(fondoMenu.textura);
+	UnloadTexture(botonFacil.textura);
+	UnloadTexture(botonNormal.textura);
+	UnloadTexture(botonDificil.textura);
 
 	CloseWindow();
 	return 0;
