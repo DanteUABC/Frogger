@@ -18,6 +18,13 @@ int intervaloCalles = 0;
 bool juegoIniciado = false;
 bool esPrimerScroll = true;
 
+Texture2D texturaCarroIzquierda;
+Texture2D texturaCarroDerecha;
+
+Music ost;
+Sound sonidoChoque;
+Sound sonidoRana;
+
 enum TipoTerreno
 {
 	TIERRA,
@@ -38,6 +45,7 @@ struct Fila
 	vector<Celda> celdas;
 	int posicion;
 	bool vaHaciaDerecha;
+	bool fueVisitado;
 };
 
 struct Carro
@@ -45,6 +53,7 @@ struct Carro
 	Vector2 posicion;
 	Vector2 tamano;
 	float velocidad;
+	Texture2D textura;
 };
 
 struct Jugador
@@ -52,6 +61,7 @@ struct Jugador
 	Vector2 posicion;
 	Vector2 tamano;
 	bool estaVivo;
+	int puntuacion;
 	Texture2D texturaActual;
 	Texture2D texturaArriba;
 	Texture2D texturaAbajo;
@@ -82,6 +92,8 @@ Fondo fondoMenu;
 vector<Fila> mapa;
 vector<Carro> carros;
 vector<int> indicesFilasCalle;
+vector<Texture2D> texturasCarroIzquierda;
+vector<Texture2D> texturasCarroDerecha;
 
 TipoTerreno proximoTipoFila = CALLE;
 int filasDeTipoRestantes = 0;
@@ -134,16 +146,13 @@ Fila crearFila(int posicionY)
 	nuevaFila.terreno = proximoTipoFila;
 	nuevaFila.posicion = posicionY;
 	nuevaFila.vaHaciaDerecha = proximaDireccionCalle;
+	nuevaFila.fueVisitado = false;
 
 	if (proximoTipoFila == CALLE)
-	{
 		proximaDireccionCalle = !proximaDireccionCalle;
-	}
 
 	for (int i = 0; i < numeroCeldas; i++)
-	{
 		nuevaFila.celdas.push_back(generarCelda(proximoTipoFila));
-	}
 
 	filasDeTipoRestantes--;
 	return nuevaFila;
@@ -160,6 +169,8 @@ void reiniciarJuego()
 
 	jugador1.estaVivo = true;
 	jugador2.estaVivo = true;
+	jugador1.puntuacion = -10;
+	jugador2.puntuacion = -10;
 	carros.clear();
 
 	mapa.clear();
@@ -170,17 +181,11 @@ void reiniciarJuego()
 	proximaDireccionCalle = true;
 
 	for (int i = numeroCeldas - 1; i >= 0; i--)
-	{
 		mapa.push_back(crearFila(i));
-	}
 	proximoIndiceGenerar = -1;
 	for (Fila& fila : mapa)
-	{
 		if (fila.terreno == CALLE)
-		{
 			PoblarFilaDeCalle(fila);
-		}
-	}
 	temporizadorScroll = 0.0f;
 	temporizadorSpawnCarro = 0.0f;
 	juegoIniciado = false;
@@ -202,6 +207,16 @@ void PoblarFilaDeCalle(Fila& fila)
 
 		nuevoCarro.posicion = { posX, posY };
 		nuevoCarro.velocidad = fila.vaHaciaDerecha ? velocidadCarro : -velocidadCarro;
+		if (fila.vaHaciaDerecha)
+		{
+			int indice = GetRandomValue(0, texturasCarroDerecha.size() - 1);
+			nuevoCarro.textura = texturasCarroDerecha[indice];
+		}
+		else
+		{
+			int indice = GetRandomValue(0, texturasCarroIzquierda.size() - 1);
+			nuevoCarro.textura = texturasCarroIzquierda[indice];
+		}
 
 		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
 
@@ -224,14 +239,21 @@ void PoblarFilaDeCalle(Fila& fila)
 		}
 
 		if (!haySolapamiento)
-		{
 			carros.push_back(nuevoCarro);
-		}
 	}
 }
 
 void actualizarJuego()
 {
+	if (juegoIniciado)
+	{
+		UpdateMusicStream(ost);
+		if (GetMusicTimePlayed(ost) >= GetMusicTimeLength(ost))
+		{
+			StopMusicStream(ost);
+			PlayMusicStream(ost);
+		}
+	}
 	if (!juegoIniciado)
 	{
 		Vector2 mousePos = GetMousePosition();
@@ -242,48 +264,58 @@ void actualizarJuego()
 
 		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
 		{
-			if (CheckCollisionPointRec(mousePos, rectFacil))
+			if (CheckCollisionPointRec(mousePos, rectFacil) || IsKeyPressed(KEY_ONE))
 			{
-				tiempoScroll = 1.0f;
+				tiempoScroll = 0.5f;
+				velocidadCarro = 100.0f;
+				reiniciarJuego();
+				juegoIniciado = true;
+				PlayMusicStream(ost);
+			}
+			else if (CheckCollisionPointRec(mousePos, rectNormal) || IsKeyPressed(KEY_TWO))
+			{
+				tiempoScroll = 0.3f;
 				velocidadCarro = 150.0f;
 				reiniciarJuego();
 				juegoIniciado = true;
+				PlayMusicStream(ost);
 			}
-			else if (CheckCollisionPointRec(mousePos, rectNormal))
+			else if (CheckCollisionPointRec(mousePos, rectDificil) || IsKeyPressed(KEY_THREE))
 			{
-				tiempoScroll = 0.5f;
+				tiempoScroll = 0.2f;
 				velocidadCarro = 200.0f;
 				reiniciarJuego();
 				juegoIniciado = true;
-			}
-			else if (CheckCollisionPointRec(mousePos, rectDificil))
-			{
-				tiempoScroll = 0.2f;
-				velocidadCarro = 300.0f;
-				reiniciarJuego();
-				juegoIniciado = true;
+				PlayMusicStream(ost);
 			}
 		}
 		return;
 	}
 	if (jugador1.posicion.y >= altoVentana)
+	{
+		if(jugador1.estaVivo)
+			PlaySound(sonidoRana);
 		jugador1.estaVivo = false;
+	}
 	if (jugador2.posicion.y >= altoVentana)
+	{
+		if (jugador2.estaVivo)
+			PlaySound(sonidoRana);
 		jugador2.estaVivo = false;
+	}
 
 	if (!jugador1.estaVivo && !jugador2.estaVivo)
 	{
-		if (IsKeyPressed(KEY_R))
-		{
+		StopMusicStream(ost);
+		if (IsKeyPressed(KEY_R) || IsKeyPressed(KEY_ENTER))
 			reiniciarJuego();
-		}
 		return;
 	}
 
 	temporizadorScroll += GetFrameTime();
 	float tiempoLimiteActual = tiempoScroll;
 	if (esPrimerScroll)
-		tiempoLimiteActual = 3.0f;
+		tiempoLimiteActual = 3.6f;
 	if (temporizadorScroll >= tiempoLimiteActual)
 	{
 		if (esPrimerScroll)
@@ -292,44 +324,28 @@ void actualizarJuego()
 			esPrimerScroll = false;
 		}
 		else
-		{
 			temporizadorScroll -= tiempoScroll;
-		}
 		mapa.push_back(crearFila(proximoIndiceGenerar));
 
 		Fila& filaRecienCreada = mapa.back();
 		if (filaRecienCreada.terreno == CALLE)
-		{
 			PoblarFilaDeCalle(filaRecienCreada);
-		}
 
 		for (Fila& fila : mapa)
-		{
 			fila.posicion++;
-		}
 		for (Carro& carro : carros)
-		{
 			carro.posicion.y += tamanoCelda;
-		}
 
 		jugador1.posicion.y += tamanoCelda;
 		jugador2.posicion.y += tamanoCelda;
 
 
 		for (int i = mapa.size() - 1; i >= 0; i--)
-		{
 			if (mapa[i].posicion >= numeroCeldas)
-			{
 				mapa.erase(mapa.begin() + i);
-			}
-		}
 		for (int i = carros.size() - 1; i >= 0; i--)
-		{
 			if (carros[i].posicion.y >= altoVentana)
-			{
 				carros.erase(carros.begin() + i);
-			}
-		}
 	}
 
 	if (jugador1.estaVivo)
@@ -398,12 +414,8 @@ void actualizarJuego()
 
 	indicesFilasCalle.clear();
 	for (int i = 0; i < mapa.size(); i++)
-	{
 		if (mapa[i].terreno == CALLE && mapa[i].posicion >= 0 && mapa[i].posicion < numeroCeldas)
-		{
 			indicesFilasCalle.push_back(i);
-		}
-	}
 
 	temporizadorSpawnCarro += GetFrameTime();
 
@@ -431,6 +443,16 @@ void actualizarJuego()
 
 		nuevoCarro.posicion = { posX, posY };
 		nuevoCarro.velocidad = vaHaciaDerecha ? velocidadCarro : -velocidadCarro;
+		if (vaHaciaDerecha)
+		{
+			int indice = GetRandomValue(0, texturasCarroDerecha.size() - 1);
+			nuevoCarro.textura = texturasCarroDerecha[indice];
+		}
+		else
+		{
+			int indice = GetRandomValue(0, texturasCarroIzquierda.size() - 1);
+			nuevoCarro.textura = texturasCarroIzquierda[indice];
+		}
 
 		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
 
@@ -454,9 +476,7 @@ void actualizarJuego()
 		}
 
 		if (!haySolapamiento)
-		{
 			carros.push_back(nuevoCarro);
-		}
 	}
 
 	for (int i = carros.size() - 1; i >= 0; i--)
@@ -466,9 +486,7 @@ void actualizarJuego()
 		bool fueraDerecha = (carros[i].velocidad > 0 && carros[i].posicion.x > anchoVentana);
 
 		if (fueraIzquierda || fueraDerecha)
-		{
 			carros.erase(carros.begin() + i);
-		}
 	}
 
 	Rectangle jugador1Hurtbox = { jugador1.posicion.x + 10, jugador1.posicion.y + 10, jugador1.tamano.x - 20, jugador1.tamano.y - 20 };
@@ -479,9 +497,37 @@ void actualizarJuego()
 		Rectangle carroHitbox = { carro.posicion.x, carro.posicion.y, carro.tamano.x, carro.tamano.y };
 
 		if (jugador1.estaVivo && CheckCollisionRecs(jugador1Hurtbox, carroHitbox))
+		{
 			jugador1.estaVivo = false;
+			PlaySound(sonidoChoque);
+		}
 		if (jugador2.estaVivo && CheckCollisionRecs(jugador2Hurtbox, carroHitbox))
+		{
 			jugador2.estaVivo = false;
+			PlaySound(sonidoChoque);
+		}
+	}
+
+	for (int i = 0; i < mapa.size(); i++)
+	{
+		if (mapa[i].terreno == TIERRA && !mapa[i].fueVisitado)
+		{
+			float filaY = mapa[i].posicion * (float)tamanoCelda;
+
+			bool j1EnFila = (jugador1.estaVivo && jugador1.posicion.y == filaY);
+			bool j2EnFila = (jugador2.estaVivo && jugador2.posicion.y == filaY);
+
+			if (j1EnFila || j2EnFila)
+			{
+				if (j1EnFila)
+					jugador1.puntuacion += 10;
+
+				if (j2EnFila)
+					jugador2.puntuacion += 10;
+
+				mapa[i].fueVisitado = true;
+			}
+		}
 	}
 }
 
@@ -498,11 +544,6 @@ void dibujarJuego()
 			float posX = i * (float)tamanoCelda;
 			DrawRectangle(posX, posY, tamanoCelda, tamanoCelda, fila.celdas[i].color);
 		}
-	}
-
-	for (const Carro& carro : carros)
-	{
-		DrawRectangleV(carro.posicion, carro.tamano, RED);
 	}
 
 	DrawTexturePro(
@@ -522,6 +563,17 @@ void dibujarJuego()
 		0.0f,
 		WHITE
 	);
+
+	for (const Carro& carro : carros)
+		DrawTexturePro(
+			carro.textura,
+			{ 0.0f, 0.0f, (float)carro.textura.width, (float)carro.textura.height },
+			{ carro.posicion.x, carro.posicion.y, carro.tamano.x, carro.tamano.y },
+			{ 0.0f, 0.0f },
+			0.0f,
+			WHITE
+		);
+	
 }
 
 void dibujarMenu()
@@ -563,6 +615,37 @@ void dibujarMenu()
 	);
 }
 
+void dibujarUI()
+{
+	DrawText(TextFormat("Verde: %d", jugador1.puntuacion), 10, 10, 30, WHITE);
+
+	const char* textoJ2 = TextFormat("Rojo: %d", jugador2.puntuacion);
+	int anchoTextoJ2 = MeasureText(textoJ2, 30);
+	DrawText(textoJ2, anchoVentana - anchoTextoJ2 - 10, 10, 30, WHITE);
+
+	if (!jugador1.estaVivo && !jugador2.estaVivo)
+	{
+		if (jugador1.puntuacion > jugador2.puntuacion)
+		{
+			const char* texto = "VERDE GANA";
+			int anchoTexto = MeasureText(texto, 60);
+			DrawText(texto, (anchoVentana - anchoTexto) / 2, altoVentana / 2 - 60, 60, WHITE);
+		}
+		if (jugador1.puntuacion < jugador2.puntuacion)
+		{
+			const char* texto = "ROJO GANA";
+			int anchoTexto = MeasureText(texto, 60);
+			DrawText(texto, (anchoVentana - anchoTexto) / 2, altoVentana / 2 - 60, 60, WHITE);
+		}
+		if (jugador1.puntuacion == jugador2.puntuacion)
+		{
+			const char* texto = "EMPATE";
+			int anchoTexto = MeasureText(texto, 60);
+			DrawText(texto, (anchoVentana - anchoTexto) / 2, altoVentana / 2 - 60, 60, WHITE);
+		}
+	}
+}
+
 
 void inicializarJuego()
 {
@@ -583,25 +666,40 @@ void inicializarJuego()
 	botonNormal.textura = LoadTexture("botonNormal.png");
 	botonDificil.textura = LoadTexture("botonDificil.png");
 
+	texturasCarroIzquierda.push_back(LoadTexture("red_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("blue_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("green_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("white_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("orange_car_left.png"));
+
+	texturasCarroDerecha.push_back(LoadTexture("red_car_right.png"));
+	texturasCarroDerecha.push_back(LoadTexture("blue_car_right.png"));
+	texturasCarroDerecha.push_back(LoadTexture("green_car_right.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("white_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("orange_car_left.png"));
+
 	fondoMenu.posicion = { 0, 0 };
 	fondoMenu.tamano = { (float)anchoVentana, (float)altoVentana };
-	float btnAncho = 200.0f;
-	float btnAlto = 100.0f;
-	float btnPosX = (anchoVentana - btnAncho) / 2.0f;
 
-	botonFacil.tamano = { btnAncho, btnAlto };
-	botonFacil.posicion = { btnPosX, 350.0f };
+	botonFacil.tamano = { 200.0f, 100.0f };
+	botonFacil.posicion = { 275.0f, 350.0f };
 
-	botonNormal.tamano = { btnAncho, btnAlto };
-	botonNormal.posicion = { btnPosX, botonFacil.posicion.y + btnAlto + 20.0f};
+	botonNormal.tamano = { 200.0f, 100.0f };
+	botonNormal.posicion = { 275.0f, 470.0f};
 
-	botonDificil.tamano = { btnAncho, btnAlto };
-	botonDificil.posicion = { btnPosX, botonNormal.posicion.y + btnAlto + 20.0f};
+	botonDificil.tamano = { 200.0f, 100.0f };
+	botonDificil.posicion = { 275.0f, 590.0f};
+
+	ost = LoadMusicStream("froggerost.mp3");
+	SetMusicVolume(ost, 0.3f);
+	sonidoChoque = LoadSound("choque.mp3");
+	sonidoRana = LoadSound("sonidoRana.mp3");
 }
 
 int main()
 {
 	InitWindow(anchoVentana, altoVentana, "Frogger x86");
+	InitAudioDevice();
 	SetTargetFPS(144);
 
 	inicializarJuego();
@@ -614,12 +712,11 @@ int main()
 		ClearBackground(DARKBROWN);
 
 		if (!juegoIniciado)
-		{
 			dibujarMenu();
-		}
 		else
 		{
 			dibujarJuego();
+			dibujarUI();
 		}
 
 
@@ -638,6 +735,15 @@ int main()
 	UnloadTexture(botonFacil.textura);
 	UnloadTexture(botonNormal.textura);
 	UnloadTexture(botonDificil.textura);
+	UnloadMusicStream(ost);
+	UnloadSound(sonidoChoque);
+	UnloadSound(sonidoRana);
+	CloseAudioDevice();
+
+	for (Texture2D textura : texturasCarroIzquierda)
+		UnloadTexture(textura);
+	for (Texture2D textura : texturasCarroDerecha)
+		UnloadTexture(textura);
 
 	CloseWindow();
 	return 0;
