@@ -671,12 +671,18 @@ void inicializarJuego()
 	texturasCarroIzquierda.push_back(LoadTexture("green_car_left.png"));
 	texturasCarroIzquierda.push_back(LoadTexture("white_car_left.png"));
 	texturasCarroIzquierda.push_back(LoadTexture("orange_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("purple_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("brown_car_left.png"));
+	texturasCarroIzquierda.push_back(LoadTexture("yellow_car_left.png"));
 
 	texturasCarroDerecha.push_back(LoadTexture("red_car_right.png"));
 	texturasCarroDerecha.push_back(LoadTexture("blue_car_right.png"));
 	texturasCarroDerecha.push_back(LoadTexture("green_car_right.png"));
-	texturasCarroIzquierda.push_back(LoadTexture("white_car_left.png"));
-	texturasCarroIzquierda.push_back(LoadTexture("orange_car_left.png"));
+	texturasCarroDerecha.push_back(LoadTexture("white_car_right.png"));
+	texturasCarroDerecha.push_back(LoadTexture("orange_car_right.png"));
+	texturasCarroDerecha.push_back(LoadTexture("purple_car_right.png"));
+	texturasCarroDerecha.push_back(LoadTexture("brown_car_right.png"));
+	texturasCarroDerecha.push_back(LoadTexture("yellow_car_right.png"));
 
 	fondoMenu.posicion = { 0, 0 };
 	fondoMenu.tamano = { (float)anchoVentana, (float)altoVentana };
