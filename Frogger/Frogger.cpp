@@ -35,6 +35,7 @@ enum TipoTerreno
 struct Celda
 {
 	Color color;
+	Texture2D textura;
 	bool solido;
 	bool ocupado;
 };
@@ -108,7 +109,7 @@ void reiniciarJuego();
 void actualizarJuego();
 void dibujarJuego();
 void dibujarMenu();
-void PoblarFilaDeCalle(Fila& fila);
+void llenarCalleDeCarros(Fila& fila);
 
 
 Celda generarCelda(TipoTerreno nuevoTerreno)
@@ -185,42 +186,47 @@ void reiniciarJuego()
 	proximoIndiceGenerar = -1;
 	for (Fila& fila : mapa)
 		if (fila.terreno == CALLE)
-			PoblarFilaDeCalle(fila);
+			llenarCalleDeCarros(fila);
 	temporizadorScroll = 0.0f;
 	temporizadorSpawnCarro = 0.0f;
 	juegoIniciado = false;
 	esPrimerScroll = true;
 }
 
-void PoblarFilaDeCalle(Fila& fila)
+void llenarCalleDeCarros(Fila& fila)
 {
-	int numCarrosAGenerar = GetRandomValue(2, 4);
+	Carro nuevoCarro;
+	float posY, posX;
+	bool seSolapan;
+	int indice, numCarrosAGenerar;
+	numCarrosAGenerar = GetRandomValue(2, 4);
+
 	for (int i = 0; i < numCarrosAGenerar; i++)
 	{
-		Carro nuevoCarro;
+		nuevoCarro;
 		nuevoCarro.tamano = { (float)tamanoCelda * 2, (float)tamanoCelda };
-		float posY = (float)fila.posicion * tamanoCelda;
+		posY = (float)fila.posicion * tamanoCelda;
 
 		int maxCeldaX = numeroCeldas - (int)(nuevoCarro.tamano.x / tamanoCelda);
 		int celdaXAleatoria = GetRandomValue(0, maxCeldaX);
-		float posX = (float)celdaXAleatoria * tamanoCelda;
+		posX = (float)celdaXAleatoria * tamanoCelda;
 
 		nuevoCarro.posicion = { posX, posY };
 		nuevoCarro.velocidad = fila.vaHaciaDerecha ? velocidadCarro : -velocidadCarro;
 		if (fila.vaHaciaDerecha)
 		{
-			int indice = GetRandomValue(0, texturasCarroDerecha.size() - 1);
+			indice = GetRandomValue(0, texturasCarroDerecha.size() - 1);
 			nuevoCarro.textura = texturasCarroDerecha[indice];
 		}
 		else
 		{
-			int indice = GetRandomValue(0, texturasCarroIzquierda.size() - 1);
+			indice = GetRandomValue(0, texturasCarroIzquierda.size() - 1);
 			nuevoCarro.textura = texturasCarroIzquierda[indice];
 		}
 
 		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
 
-		bool haySolapamiento = false;
+		seSolapan = false;
 		for (const Carro& carroExistente : carros)
 		{
 			if (carroExistente.posicion.y != posY) continue;
@@ -233,18 +239,23 @@ void PoblarFilaDeCalle(Fila& fila)
 
 			if (CheckCollisionRecs(rectNuevoConEspacio, rectCarroExistente))
 			{
-				haySolapamiento = true;
+				seSolapan = true;
 				break;
 			}
 		}
 
-		if (!haySolapamiento)
+		if (!seSolapan)
 			carros.push_back(nuevoCarro);
 	}
 }
 
 void actualizarJuego()
 {
+	int indiceTexturas, indiceAleatorio, indiceEnMapa;
+	Vector2 mousePos;
+	float tiempoLimiteActual;
+	bool vaHaciaDerecha;
+
 	if (juegoIniciado)
 	{
 		UpdateMusicStream(ost);
@@ -256,14 +267,13 @@ void actualizarJuego()
 	}
 	if (!juegoIniciado)
 	{
-		Vector2 mousePos = GetMousePosition();
+		mousePos = GetMousePosition();
 
 		Rectangle rectFacil = { botonFacil.posicion.x, botonFacil.posicion.y, botonFacil.tamano.x, botonFacil.tamano.y };
 		Rectangle rectNormal = { botonNormal.posicion.x, botonNormal.posicion.y, botonNormal.tamano.x, botonNormal.tamano.y };
 		Rectangle rectDificil = { botonDificil.posicion.x, botonDificil.posicion.y, botonDificil.tamano.x, botonDificil.tamano.y };
 
 		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-		{
 			if (CheckCollisionPointRec(mousePos, rectFacil) || IsKeyPressed(KEY_ONE))
 			{
 				tiempoScroll = 0.5f;
@@ -288,12 +298,11 @@ void actualizarJuego()
 				juegoIniciado = true;
 				PlayMusicStream(ost);
 			}
-		}
 		return;
 	}
 	if (jugador1.posicion.y >= altoVentana)
 	{
-		if(jugador1.estaVivo)
+		if (jugador1.estaVivo)
 			PlaySound(sonidoRana);
 		jugador1.estaVivo = false;
 	}
@@ -313,9 +322,9 @@ void actualizarJuego()
 	}
 
 	temporizadorScroll += GetFrameTime();
-	float tiempoLimiteActual = tiempoScroll;
+	tiempoLimiteActual = tiempoScroll;
 	if (esPrimerScroll)
-		tiempoLimiteActual = 3.6f;
+		tiempoLimiteActual = 3.6f; // ajustado a la música
 	if (temporizadorScroll >= tiempoLimiteActual)
 	{
 		if (esPrimerScroll)
@@ -329,7 +338,7 @@ void actualizarJuego()
 
 		Fila& filaRecienCreada = mapa.back();
 		if (filaRecienCreada.terreno == CALLE)
-			PoblarFilaDeCalle(filaRecienCreada);
+			llenarCalleDeCarros(filaRecienCreada);
 
 		for (Fila& fila : mapa)
 			fila.posicion++;
@@ -352,31 +361,97 @@ void actualizarJuego()
 	{
 		if (IsKeyPressed(KEY_W))
 		{
-			jugador1.texturaActual = jugador1.texturaArriba;
+			__asm
+			{
+				lea esi, jugador1.texturaArriba
+				lea edi, jugador1.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR1_ARRIBA:
+					mov bl, [esi+eax]
+					mov [edi+eax], bl
+					inc eax
+				loop COPIAR_TEXTURA_JUGADOR1_ARRIBA
+			}
 			if (jugador1.posicion.y != 0 &&
 				!(jugador2.posicion.y == jugador1.posicion.y - tamanoCelda && jugador2.posicion.x == jugador1.posicion.x && jugador2.estaVivo))
-				jugador1.posicion.y -= tamanoCelda;
+				__asm 
+				{
+					fld jugador1.posicion.y
+					fisub tamanoCelda
+					fstp jugador1.posicion.y
+				}
+				
 		}
 		if (IsKeyPressed(KEY_S))
 		{
-			jugador1.texturaActual = jugador1.texturaAbajo;
+			__asm
+			{
+				lea esi, jugador1.texturaAbajo
+				lea edi, jugador1.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR1_ABAJO:
+				mov bl, [esi + eax]
+					mov[edi + eax], bl
+					inc eax
+					loop COPIAR_TEXTURA_JUGADOR1_ABAJO
+			}
 			if (jugador1.posicion.y != GetScreenHeight() - tamanoCelda &&
 				!(jugador2.posicion.y == jugador1.posicion.y + tamanoCelda && jugador2.posicion.x == jugador1.posicion.x && jugador2.estaVivo))
-				jugador1.posicion.y += tamanoCelda;
+				__asm
+				{
+					fld jugador1.posicion.y
+					fiadd tamanoCelda
+					fstp jugador1.posicion.y
+				}
 		}
 		if (IsKeyPressed(KEY_A))
 		{
-			jugador1.texturaActual = jugador1.texturaIzquierda;
+			__asm
+			{
+				lea esi, jugador1.texturaIzquierda
+				lea edi, jugador1.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR1_IZQUIERDA:
+				mov bl, [esi + eax]
+					mov[edi + eax], bl
+					inc eax
+					loop COPIAR_TEXTURA_JUGADOR1_IZQUIERDA
+			}
 			if (jugador1.posicion.x != 0 &&
 				!(jugador2.posicion.y == jugador1.posicion.y && jugador2.posicion.x == jugador1.posicion.x - tamanoCelda && jugador2.estaVivo))
-				jugador1.posicion.x -= tamanoCelda;
+				__asm
+				{
+					fld jugador1.posicion.x
+					fisub tamanoCelda
+					fstp jugador1.posicion.x
+				}
 		}
 		if (IsKeyPressed(KEY_D))
 		{
-			jugador1.texturaActual = jugador1.texturaDerecha;
+			__asm
+			{
+				lea esi, jugador1.texturaDerecha
+				lea edi, jugador1.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR1_DERECHA:
+				mov bl, [esi + eax]
+					mov[edi + eax], bl
+					inc eax
+					loop COPIAR_TEXTURA_JUGADOR1_DERECHA
+			}
 			if (jugador1.posicion.x != GetScreenWidth() - tamanoCelda &&
 				!(jugador2.posicion.y == jugador1.posicion.y && jugador2.posicion.x == jugador1.posicion.x + tamanoCelda && jugador2.estaVivo))
-				jugador1.posicion.x += tamanoCelda;
+				__asm
+				{
+					fld jugador1.posicion.x
+					fiadd tamanoCelda
+					fstp jugador1.posicion.x
+				}
+
 		}
 	}
 
@@ -384,31 +459,95 @@ void actualizarJuego()
 	{
 		if (IsKeyPressed(KEY_UP))
 		{
-			jugador2.texturaActual = jugador2.texturaArriba;
+			__asm
+			{
+				lea esi, jugador2.texturaArriba
+				lea edi, jugador2.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR2_ARRIBA:
+				mov bl, [esi + eax]
+					mov[edi + eax], bl
+					inc eax
+					loop COPIAR_TEXTURA_JUGADOR2_ARRIBA
+			}
 			if (jugador2.posicion.y != 0 &&
 				!(jugador1.posicion.y == jugador2.posicion.y - tamanoCelda && jugador1.posicion.x == jugador2.posicion.x && jugador1.estaVivo))
-				jugador2.posicion.y -= tamanoCelda;
+				__asm
+				{
+					fld jugador2.posicion.y
+					fisub tamanoCelda
+					fstp jugador2.posicion.y
+				}
 		}
 		if (IsKeyPressed(KEY_DOWN))
 		{
-			jugador2.texturaActual = jugador2.texturaAbajo;
+			__asm
+			{
+				lea esi, jugador2.texturaAbajo
+				lea edi, jugador2.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR2_ABAJO:
+				mov bl, [esi + eax]
+					mov[edi + eax], bl
+					inc eax
+					loop COPIAR_TEXTURA_JUGADOR2_ABAJO
+			}
 			if (jugador2.posicion.y != GetScreenHeight() - tamanoCelda &&
 				!(jugador1.posicion.y == jugador2.posicion.y + tamanoCelda && jugador1.posicion.x == jugador2.posicion.x && jugador1.estaVivo))
-				jugador2.posicion.y += tamanoCelda;
+				__asm
+				{
+					fld jugador2.posicion.y
+					fiadd tamanoCelda
+					fstp jugador2.posicion.y
+				}
 		}
 		if (IsKeyPressed(KEY_LEFT))
 		{
-			jugador2.texturaActual = jugador2.texturaIzquierda;
+			__asm
+			{
+				lea esi, jugador2.texturaIzquierda
+				lea edi, jugador2.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR2_IZQUIERDA:
+				mov bl, [esi + eax]
+					mov[edi + eax], bl
+					inc eax
+					loop COPIAR_TEXTURA_JUGADOR2_IZQUIERDA
+			}
 			if (jugador2.posicion.x != 0 &&
 				!(jugador1.posicion.y == jugador2.posicion.y && jugador1.posicion.x == jugador2.posicion.x - tamanoCelda && jugador1.estaVivo))
-				jugador2.posicion.x -= tamanoCelda;
+				__asm
+				{
+					fld jugador2.posicion.x
+					fisub tamanoCelda
+					fstp jugador2.posicion.x
+				}
 		}
 		if (IsKeyPressed(KEY_RIGHT))
 		{
-			jugador2.texturaActual = jugador2.texturaDerecha;
+			__asm
+			{
+				lea esi, jugador2.texturaDerecha
+				lea edi, jugador2.texturaActual
+				mov ecx, 20
+				mov eax, 0
+				COPIAR_TEXTURA_JUGADOR2_DERECHA:
+				mov bl, [esi + eax]
+					mov[edi + eax], bl
+					inc eax
+					loop COPIAR_TEXTURA_JUGADOR2_DERECHA
+			}
 			if (jugador2.posicion.x != GetScreenWidth() - tamanoCelda &&
 				!(jugador1.posicion.y == jugador2.posicion.y && jugador1.posicion.x == jugador2.posicion.x + tamanoCelda && jugador1.estaVivo))
-				jugador2.posicion.x += tamanoCelda;
+				__asm
+				{
+					fld jugador2.posicion.x
+					fiadd tamanoCelda
+					fstp jugador2.posicion.x
+				}
 		}
 	}
 
@@ -421,21 +560,25 @@ void actualizarJuego()
 
 	if (temporizadorSpawnCarro >= tiempoSpawnCarro && !indicesFilasCalle.empty())
 	{
+		int indiceFilaY;
+		float posY, posX;
+		bool vaHaciaDerecha;
+		bool seSolapan;
+
 		temporizadorSpawnCarro = 0.0f;
 		tiempoSpawnCarro = (float)GetRandomValue(5, 15) / 10.0f;
 
 		Carro nuevoCarro;
 		nuevoCarro.tamano = { (float)tamanoCelda * 2, (float)tamanoCelda };
 
-		int indiceAleatorio = GetRandomValue(0, indicesFilasCalle.size() - 1);
-		int indiceEnMapa = indicesFilasCalle[indiceAleatorio];
+		indiceAleatorio = GetRandomValue(0, indicesFilasCalle.size() - 1);
+		indiceEnMapa = indicesFilasCalle[indiceAleatorio];
 		Fila& filaDeCalle = mapa[indiceEnMapa];
 
-		int indiceFilaY = filaDeCalle.posicion;
-		float posY = (float)indiceFilaY * tamanoCelda;
-		bool vaHaciaDerecha = filaDeCalle.vaHaciaDerecha;
+		indiceFilaY = filaDeCalle.posicion;
+		posY = (float)indiceFilaY * tamanoCelda;
+		vaHaciaDerecha = filaDeCalle.vaHaciaDerecha;
 
-		float posX;
 		if (vaHaciaDerecha)
 			posX = -nuevoCarro.tamano.x;
 		else
@@ -445,47 +588,49 @@ void actualizarJuego()
 		nuevoCarro.velocidad = vaHaciaDerecha ? velocidadCarro : -velocidadCarro;
 		if (vaHaciaDerecha)
 		{
-			int indice = GetRandomValue(0, texturasCarroDerecha.size() - 1);
-			nuevoCarro.textura = texturasCarroDerecha[indice];
+			indiceTexturas = GetRandomValue(0, texturasCarroDerecha.size() - 1);
+			nuevoCarro.textura = texturasCarroDerecha[indiceTexturas];
 		}
 		else
 		{
-			int indice = GetRandomValue(0, texturasCarroIzquierda.size() - 1);
-			nuevoCarro.textura = texturasCarroIzquierda[indice];
+			indiceTexturas = GetRandomValue(0, texturasCarroIzquierda.size() - 1);
+			nuevoCarro.textura = texturasCarroIzquierda[indiceTexturas];
 		}
 
 		Rectangle rectNuevoCarro = { nuevoCarro.posicion.x, nuevoCarro.posicion.y, nuevoCarro.tamano.x, nuevoCarro.tamano.y };
 
-		bool haySolapamiento = false;
+		seSolapan = false;
 
 		for (const Carro& carroExistente : carros)
 		{
-			if (carroExistente.posicion.y != posY) continue;
+			if (carroExistente.posicion.y != posY) 
+				continue;
 
 			Rectangle rectCarroExistente = { carroExistente.posicion.x, carroExistente.posicion.y, carroExistente.tamano.x, carroExistente.tamano.y };
 
-			Rectangle rectNuevoConEspacio = rectNuevoCarro;
-			rectNuevoConEspacio.x -= tamanoCelda;
-			rectNuevoConEspacio.width += tamanoCelda * 2;
+			Rectangle rectNuevoConMargen = rectNuevoCarro;
+			rectNuevoConMargen.x -= tamanoCelda;
+			rectNuevoConMargen.width += tamanoCelda * 2;
 
-			if (CheckCollisionRecs(rectNuevoConEspacio, rectCarroExistente))
+			if (CheckCollisionRecs(rectNuevoConMargen, rectCarroExistente))
 			{
-				haySolapamiento = true;
+				seSolapan = true;
 				break;
 			}
 		}
 
-		if (!haySolapamiento)
+		if (!seSolapan)
 			carros.push_back(nuevoCarro);
 	}
 
 	for (int i = carros.size() - 1; i >= 0; i--)
 	{
 		carros[i].posicion.x += carros[i].velocidad * GetFrameTime();
-		bool fueraIzquierda = (carros[i].velocidad < 0 && carros[i].posicion.x + carros[i].tamano.x < 0);
-		bool fueraDerecha = (carros[i].velocidad > 0 && carros[i].posicion.x > anchoVentana);
+		//bool fueraIzquierda = (carros[i].velocidad < 0 && carros[i].posicion.x + carros[i].tamano.x < 0);
+		//bool fueraDerecha = (carros[i].velocidad > 0 && carros[i].posicion.x > anchoVentana);
 
-		if (fueraIzquierda || fueraDerecha)
+		if ((carros[i].velocidad < 0 && carros[i].posicion.x + carros[i].tamano.x < 0) || 
+			(carros[i].velocidad > 0 && carros[i].posicion.x > anchoVentana))
 			carros.erase(carros.begin() + i);
 	}
 
@@ -573,7 +718,7 @@ void dibujarJuego()
 			0.0f,
 			WHITE
 		);
-	
+
 }
 
 void dibujarMenu()
@@ -581,7 +726,7 @@ void dibujarMenu()
 	DrawTexturePro(
 		fondoMenu.textura,
 		{ 0.0f, 0.0f, (float)fondoMenu.textura.width, (float)fondoMenu.textura.height },
-		{ 0.0f, 0.0f, 750, 750},
+		{ 0.0f, 0.0f, 750, 750 },
 		{ 0.0f, 0.0f },
 		0.0f,
 		WHITE
@@ -691,10 +836,10 @@ void inicializarJuego()
 	botonFacil.posicion = { 275.0f, 350.0f };
 
 	botonNormal.tamano = { 200.0f, 100.0f };
-	botonNormal.posicion = { 275.0f, 470.0f};
+	botonNormal.posicion = { 275.0f, 470.0f };
 
 	botonDificil.tamano = { 200.0f, 100.0f };
-	botonDificil.posicion = { 275.0f, 590.0f};
+	botonDificil.posicion = { 275.0f, 590.0f };
 
 	ost = LoadMusicStream("froggerost.mp3");
 	SetMusicVolume(ost, 0.3f);
