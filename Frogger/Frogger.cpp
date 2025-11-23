@@ -162,24 +162,78 @@ Fila crearFila(int posicionY)
 
 void reiniciarJuego()
 {
-	jugador1.posicion = { 4 * (float)tamanoCelda, (numeroCeldas - 1) * (float)tamanoCelda };
-	jugador2.posicion = { 9 * (float)tamanoCelda, (numeroCeldas - 1) * (float)tamanoCelda };
+	__asm
+	{
+		mov eax, 200
+		mov ebx, 700
+		cvtsi2ss xmm0, eax
+		cvtsi2ss xmm1, ebx
+		movss jugador1.posicion.x, xmm0
+		movss jugador1.posicion.y, xmm1
 
-	jugador1.texturaActual = jugador1.texturaArriba;
-	jugador2.texturaActual = jugador2.texturaArriba;
+		mov eax, 450
+		mov ebx, 700
+		cvtsi2ss xmm0, eax
+		cvtsi2ss xmm1, ebx
+		movss jugador2.posicion.x, xmm0
+		movss jugador2.posicion.y, xmm1
 
-	jugador1.estaVivo = true;
-	jugador2.estaVivo = true;
-	jugador1.puntuacion = -10;
-	jugador2.puntuacion = -10;
+		mov al, 1
+		mov bl, 1
+		mov jugador1.estaVivo, al
+		mov jugador2.estaVivo, bl
+
+		mov eax, -10
+		mov ebx, -10
+		mov jugador1.puntuacion, eax
+		mov jugador2.puntuacion, ebx
+
+		lea esi, jugador1.texturaArriba
+		lea edi, jugador1.texturaActual
+		mov ecx, 20
+		mov eax, 0
+		COPIAR_TEXTURA_JUGADOR1_ARRIBA2:
+		mov bl, [esi + eax]
+			mov[edi + eax], bl
+			inc eax
+		loop COPIAR_TEXTURA_JUGADOR1_ARRIBA2
+		lea esi, jugador2.texturaArriba
+		lea edi, jugador2.texturaActual
+		mov ecx, 20
+		mov eax, 0
+		COPIAR_TEXTURA_JUGADOR2_ARRIBA2:
+			mov bl, [esi+eax]
+			mov [edi+eax], bl
+			inc eax
+		loop COPIAR_TEXTURA_JUGADOR2_ARRIBA2
+
+		mov eax, 0
+		mov filasDeTipoRestantes, eax
+
+		mov al, 1
+		mov proximaDireccionCalle, al
+
+		mov eax, 0
+		cvtsi2ss xmm0, eax
+		movss temporizadorScroll, xmm0
+
+		mov eax, 0
+		cvtsi2ss xmm0, eax
+		movss temporizadorSpawnCarro, xmm0
+
+		mov al, 0
+		mov juegoIniciado, al
+
+		mov al, 1
+		mov esPrimerScroll, al
+	}
+
+	proximoTipoFila = CALLE;
+
 	carros.clear();
 
 	mapa.clear();
 	indicesFilasCalle.clear();
-
-	proximoTipoFila = CALLE;
-	filasDeTipoRestantes = 0;
-	proximaDireccionCalle = true;
 
 	for (int i = numeroCeldas - 1; i >= 0; i--)
 		mapa.push_back(crearFila(i));
@@ -187,10 +241,7 @@ void reiniciarJuego()
 	for (Fila& fila : mapa)
 		if (fila.terreno == CALLE)
 			llenarCalleDeCarros(fila);
-	temporizadorScroll = 0.0f;
-	temporizadorSpawnCarro = 0.0f;
-	juegoIniciado = false;
-	esPrimerScroll = true;
+
 }
 
 void llenarCalleDeCarros(Fila& fila)
@@ -229,7 +280,8 @@ void llenarCalleDeCarros(Fila& fila)
 		seSolapan = false;
 		for (const Carro& carroExistente : carros)
 		{
-			if (carroExistente.posicion.y != posY) continue;
+			if (carroExistente.posicion.y != posY) 
+				continue;
 
 			Rectangle rectCarroExistente = { carroExistente.posicion.x, carroExistente.posicion.y, carroExistente.tamano.x, carroExistente.tamano.y };
 
@@ -276,26 +328,59 @@ void actualizarJuego()
 		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
 			if (CheckCollisionPointRec(mousePos, rectFacil) || IsKeyPressed(KEY_ONE))
 			{
-				tiempoScroll = 0.5f;
-				velocidadCarro = 100.0f;
-				reiniciarJuego();
-				juegoIniciado = true;
+				__asm
+				{
+					mov eax, 0x3F000000 //0.5
+					movd xmm0, eax
+					movss tiempoScroll, xmm0
+					
+					mov eax, 100
+					cvtsi2ss xmm0, eax 
+					movss velocidadCarro, xmm0
+
+					call reiniciarJuego
+
+					mov al, 1
+					mov juegoIniciado, al
+				}
 				PlayMusicStream(ost);
 			}
 			else if (CheckCollisionPointRec(mousePos, rectNormal) || IsKeyPressed(KEY_TWO))
 			{
-				tiempoScroll = 0.3f;
-				velocidadCarro = 150.0f;
-				reiniciarJuego();
-				juegoIniciado = true;
+				__asm
+				{
+					mov eax, 0x3E999999 // 0.3
+					movd xmm0, eax
+					movss tiempoScroll, xmm0
+
+					mov eax, 150
+					cvtsi2ss xmm0, eax
+					movss velocidadCarro, xmm0
+
+					call reiniciarJuego
+
+					mov al, 1
+					mov juegoIniciado, al
+				}
 				PlayMusicStream(ost);
 			}
 			else if (CheckCollisionPointRec(mousePos, rectDificil) || IsKeyPressed(KEY_THREE))
 			{
-				tiempoScroll = 0.2f;
-				velocidadCarro = 200.0f;
-				reiniciarJuego();
-				juegoIniciado = true;
+				__asm
+				{
+					mov eax, 0x3E4CCCCD // 0.2
+					movd xmm0, eax
+					movss tiempoScroll, xmm0
+
+					mov eax, 200
+					cvtsi2ss xmm0, eax
+					movss velocidadCarro, xmm0
+
+					call reiniciarJuego
+
+					mov al, 1
+					mov juegoIniciado, al
+				}
 				PlayMusicStream(ost);
 			}
 		return;
@@ -304,36 +389,67 @@ void actualizarJuego()
 	{
 		if (jugador1.estaVivo)
 			PlaySound(sonidoRana);
+		__asm
+		{
+			mov al, 0
+			mov jugador1.estaVivo, al
+		}
 		jugador1.estaVivo = false;
 	}
 	if (jugador2.posicion.y >= altoVentana)
 	{
 		if (jugador2.estaVivo)
 			PlaySound(sonidoRana);
-		jugador2.estaVivo = false;
+		__asm
+		{
+			mov al, 0
+			mov jugador2.estaVivo, al
+		}
 	}
 
 	if (!jugador1.estaVivo && !jugador2.estaVivo)
 	{
 		StopMusicStream(ost);
 		if (IsKeyPressed(KEY_R) || IsKeyPressed(KEY_ENTER))
-			reiniciarJuego();
+			__asm
+			{
+				call reiniciarJuego
+			}
 		return;
 	}
+	__asm
+	{
+		call GetFrameTime
+		fadd temporizadorScroll
+		fstp temporizadorScroll
 
-	temporizadorScroll += GetFrameTime();
-	tiempoLimiteActual = tiempoScroll;
-	if (esPrimerScroll)
-		tiempoLimiteActual = 3.6f; // ajustado a la música
+		movss xmm0, tiempoScroll
+		movss tiempoLimiteActual, xmm0
+
+		cmp esPrimerScroll, 0
+		je PRIMER_SCROLL
+			mov eax, 0x40666666; 3.6 < -ajustado a la música
+			movd xmm0, eax
+			movss tiempoLimiteActual, xmm0
+		PRIMER_SCROLL:
+	}
 	if (temporizadorScroll >= tiempoLimiteActual)
 	{
-		if (esPrimerScroll)
+		__asm
 		{
-			temporizadorScroll = 0.0f;
-			esPrimerScroll = false;
+			je PRIMER_SCROLL2
+				mov eax, 0
+				cvtsi2ss xmm0, eax
+				movss temporizadorScroll, xmm0
+				mov al, 0
+				mov esPrimerScroll, al
+				jmp YA_PRIMER_SCROLL2
+			PRIMER_SCROLL2:
+			fld temporizadorScroll
+			fsub tiempoScroll
+			fstp temporizadorScroll
+			YA_PRIMER_SCROLL2:
 		}
-		else
-			temporizadorScroll -= tiempoScroll;
 		mapa.push_back(crearFila(proximoIndiceGenerar));
 
 		Fila& filaRecienCreada = mapa.back();
@@ -565,10 +681,11 @@ void actualizarJuego()
 		bool vaHaciaDerecha;
 		bool seSolapan;
 
+		Carro nuevoCarro;
+
 		temporizadorSpawnCarro = 0.0f;
 		tiempoSpawnCarro = (float)GetRandomValue(5, 15) / 10.0f;
 
-		Carro nuevoCarro;
 		nuevoCarro.tamano = { (float)tamanoCelda * 2, (float)tamanoCelda };
 
 		indiceAleatorio = GetRandomValue(0, indicesFilasCalle.size() - 1);
